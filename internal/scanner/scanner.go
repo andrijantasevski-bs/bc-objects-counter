@@ -20,7 +20,8 @@ type BCObject struct {
 
 // objectPattern matches BC object declarations.
 // Captures: 1=type, 2=id (optional for some types), 3=name
-var objectPattern = regexp.MustCompile(`(?i)^\s*(table|tableextension|page|pageextension|report|reportextension|codeunit|xmlport|query|enum|enumextension|interface|permissionset|permissionsetextension|profile|controladdin|entitlement)\s+(\d+)?\s*"([^"]+)"`)
+// Note: Order matters! More specific types (e.g., tableextension) must come before less specific (e.g., table)
+var objectPattern = regexp.MustCompile(`(?i)^\s*(tableextension|table|pageextension|page|reportextension|report|codeunit|xmlport|query|enumextension|enum|interface|permissionsetextension|permissionset|profile|controladdin|entitlement)\s+(\d+)?\s*"([^"]+)"`)
 
 // ScanDirectory recursively scans a directory for .al files and extracts BC objects.
 func ScanDirectory(root string, recursive bool) ([]BCObject, error) {

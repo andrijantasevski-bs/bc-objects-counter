@@ -14,18 +14,18 @@ A fast CLI tool to scan Business Central AL files and count object types.
 
 ### Download Binary
 
-Download the latest release from the [Releases page](https://github.com/andrijan/bc-objects-counter/releases).
+Download the latest release from the [Releases page](https://github.com/andrijantasevski-bs/bc-objects-counter/releases).
 
 ### Build from Source
 
 ```bash
-go install github.com/andrijan/bc-objects-counter@latest
+go install github.com/andrijantasevski-bs/bc-objects-counter@latest
 ```
 
 Or clone and build:
 
 ```bash
-git clone https://github.com/andrijan/bc-objects-counter.git
+git clone https://github.com/andrijantasevski-bs/bc-objects-counter.git
 cd bc-objects-counter
 go build -o bc-objects-counter
 ```
@@ -33,33 +33,41 @@ go build -o bc-objects-counter
 ## Usage
 
 ```bash
-# Scan current directory and print to console
-bc-objects-counter
-
-# Scan a specific directory
+# Scan a directory (required argument)
 bc-objects-counter /path/to/al/files
 
 # Export to JSON
-bc-objects-counter -o json
+bc-objects-counter /path/to/al/files -o json
 
 # Export to Excel
-bc-objects-counter -o xlsx
+bc-objects-counter /path/to/al/files -o xlsx
 
 # Export to PDF
-bc-objects-counter -o pdf
+bc-objects-counter /path/to/al/files -o pdf
 
 # Export all formats at once
-bc-objects-counter -o all
+bc-objects-counter /path/to/al/files -o all
 
 # Specify output filename
-bc-objects-counter -o xlsx -f my-report
+bc-objects-counter /path/to/al/files -o xlsx -f my-report
 
-# Non-recursive scan (current directory only)
-bc-objects-counter -r=false
+# Non-recursive scan (directory only, no subdirectories)
+bc-objects-counter /path/to/al/files -r=false
 
 # Show verbose output
-bc-objects-counter -v
+bc-objects-counter /path/to/al/files -v
 ```
+
+### Command Line Options
+
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| `--output` | `-o` | Output format: `console`, `json`, `xlsx`, `pdf`, `all` | `console` |
+| `--file` | `-f` | Output filename (without extension) | auto-generated |
+| `--recursive` | `-r` | Scan subdirectories | `true` |
+| `--verbose` | `-v` | Show detailed output | `false` |
+| `--version` | | Show version | |
+| `--help` | `-h` | Show help | |
 
 ## Supported Object Types
 

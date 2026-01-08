@@ -24,13 +24,16 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "bc-objects-counter [path]",
+	Use:   "bc-objects-counter <path>",
 	Short: "Count Business Central objects in AL files",
 	Long: `BC Objects Counter scans a directory for Business Central AL files
 and counts all object types (tables, pages, codeunits, etc.).
 
-It can export the results to JSON, Excel, or PDF format.`,
-	Args: cobra.MaximumNArgs(1),
+It can export the results to JSON, Excel, or PDF format.
+
+Arguments:
+  path    Directory path to scan for .al files (required)`,
+	Args: cobra.ExactArgs(1),
 	RunE: runCounter,
 }
 
@@ -48,11 +51,8 @@ func init() {
 }
 
 func runCounter(cmd *cobra.Command, args []string) error {
-	// Determine scan path
-	scanPath := "."
-	if len(args) > 0 {
-		scanPath = args[0]
-	}
+	// Path is required (enforced by cobra.ExactArgs(1))
+	scanPath := args[0]
 
 	// Convert to absolute path
 	absPath, err := filepath.Abs(scanPath)
