@@ -18,10 +18,16 @@ type BCObject struct {
 	FilePath string `json:"filePath"`
 }
 
-// objectPattern matches BC object declarations.
-// Captures: 1=type, 2=id (optional for some types), 3=name
-// Note: Order matters! More specific types (e.g., tableextension) must come before less specific (e.g., table)
-var objectPattern = regexp.MustCompile(`(?i)^\s*(tableextension|table|pageextension|page|reportextension|report|codeunit|xmlport|query|enumextension|enum|interface|permissionsetextension|permissionset|profile|controladdin|entitlement)\s+(\d+)?\s*"([^"]+)"`)
+// objectPatternWithID matches BC object declarations that REQUIRE an ID.
+// These are: table, tableextension, page, pageextension, report, reportextension,
+// codeunit, xmlport, query, enum, enumextension, permissionset, permissionsetextension
+// Pattern requires: type + ID (digits) + "name"
+var objectPatternWithID = regexp.MustCompile(`(?i)^\s*(tableextension|table|pageextension|page|reportextension|report|codeunit|xmlport|query|enumextension|enum|permissionsetextension|permissionset)\s+(\d+)\s+"([^"]+)"`)
+
+// objectPatternNoID matches BC object declarations that do NOT have an ID.
+// These are: interface, profile, controladdin, entitlement
+// Pattern requires: type + "name" (no ID)
+var objectPatternNoID = regexp.MustCompile(`(?i)^\s*(interface|profile|controladdin|entitlement)\s+"([^"]+)"`)
 
 // ScanDirectory recursively scans a directory for .al files and extracts BC objects.
 func ScanDirectory(root string, recursive bool) ([]BCObject, error) {
@@ -111,21 +117,27 @@ func ScanFile(filePath string) ([]BCObject, error) {
 
 // ParseObjectLine attempts to parse a BC object declaration from a single line.
 func ParseObjectLine(line, filePath string) *BCObject {
-	matches := objectPattern.FindStringSubmatch(line)
-	if matches == nil {
-		return nil
+	// First try to match objects that require an ID (table, page, codeunit, etc.)
+	if matches := objectPatternWithID.FindStringSubmatch(line); matches != nil {
+		return &BCObject{
+			Type:     strings.ToLower(matches[1]),
+			ID:       matches[2],
+			Name:     matches[3],
+			FilePath: filePath,
+		}
 	}
 
-	objType := strings.ToLower(matches[1])
-	objID := matches[2] // May be empty for interface, profile, controladdin, entitlement
-	objName := matches[3]
-
-	return &BCObject{
-		Type:     objType,
-		ID:       objID,
-		Name:     objName,
-		FilePath: filePath,
+	// Then try to match objects without an ID (interface, profile, controladdin, entitlement)
+	if matches := objectPatternNoID.FindStringSubmatch(line); matches != nil {
+		return &BCObject{
+			Type:     strings.ToLower(matches[1]),
+			ID:       "",
+			Name:     matches[2],
+			FilePath: filePath,
+		}
 	}
+
+	return nil
 }
 
 // GetSupportedObjectTypes returns a list of all supported BC object types.

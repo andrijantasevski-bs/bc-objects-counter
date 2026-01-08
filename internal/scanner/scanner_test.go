@@ -180,6 +180,81 @@ func TestParseObjectLine(t *testing.T) {
 				Name: "My Control Addin",
 			},
 		},
+		// Permission set reference tests - these should NOT match
+		{
+			name:     "permission reference - table without ID",
+			line:     `        table "PTE HS User" = X,`,
+			expected: nil,
+		},
+		{
+			name:     "permission reference - tabledata",
+			line:     `        tabledata "PTE HS User" = RIMD,`,
+			expected: nil,
+		},
+		{
+			name:     "permission reference - codeunit without ID",
+			line:     `        codeunit "My Codeunit" = X,`,
+			expected: nil,
+		},
+		{
+			name:     "permission reference - page without ID",
+			line:     `        page "My Page" = X,`,
+			expected: nil,
+		},
+		{
+			name:     "permission reference - report without ID",
+			line:     `        report "My Report" = X,`,
+			expected: nil,
+		},
+		{
+			name:     "permission reference - query without ID",
+			line:     `        query "My Query" = X,`,
+			expected: nil,
+		},
+		{
+			name:     "permission reference - xmlport without ID",
+			line:     `        xmlport "My XMLport" = X,`,
+			expected: nil,
+		},
+		// Entitlement test
+		{
+			name: "entitlement without ID",
+			line: `entitlement "My Entitlement"`,
+			expected: &BCObject{
+				Type: "entitlement",
+				ID:   "",
+				Name: "My Entitlement",
+			},
+		},
+		// Additional edge cases
+		{
+			name:     "table in variable declaration",
+			line:     `    MyTable: Record "Customer";`,
+			expected: nil,
+		},
+		{
+			name:     "codeunit in variable declaration",
+			line:     `    MyCU: Codeunit "Sales-Post";`,
+			expected: nil,
+		},
+		{
+			name: "permissionsetextension with ID",
+			line: `permissionsetextension 50100 "My Perm Set Ext" extends "D365 BASIC"`,
+			expected: &BCObject{
+				Type: "permissionsetextension",
+				ID:   "50100",
+				Name: "My Perm Set Ext",
+			},
+		},
+		{
+			name: "reportextension with ID",
+			line: `reportextension 50100 "My Report Ext" extends "Standard Sales - Invoice"`,
+			expected: &BCObject{
+				Type: "reportextension",
+				ID:   "50100",
+				Name: "My Report Ext",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -264,6 +339,140 @@ page 50100 "Customer Card Ext"
 		}
 		if obj.Name != expectedNames[i] {
 			t.Errorf("object %d: expected name %s, got %s", i, expectedNames[i], obj.Name)
+		}
+	}
+}
+
+func TestScanFilePermissionSet(t *testing.T) {
+	// Test that permission set files only count the permissionset itself,
+	// not the table/codeunit/page references inside
+	content := `permissionset 50080 "PTE HS PermissionSet"
+{
+    Assignable = true;
+    Caption = 'HubSpot Permission Set';
+
+    Permissions =
+        table "PTE HS User" = X,
+        table "PTE HS Pipeline" = X,
+        table "PTE HS Object Type" = X,
+        table "PTE HS API Log" = X,
+        tabledata "PTE HS User" = RIMD,
+        tabledata "PTE HS Pipeline" = RIMD,
+        codeunit "PTE HS HubSpot Management" = X,
+        page "PTE HS Users" = X,
+        page "PTE HS Pipelines" = X,
+        query "PTE HS BC Instance API" = X;
+}
+`
+
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "permissionset.al")
+	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	objects, err := ScanFile(tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should only find 1 object: the permissionset declaration
+	if len(objects) != 1 {
+		t.Errorf("expected 1 object (permissionset only), got %d", len(objects))
+		for _, obj := range objects {
+			t.Logf("  found: %s %s %q", obj.Type, obj.ID, obj.Name)
+		}
+	}
+
+	if len(objects) > 0 {
+		if objects[0].Type != "permissionset" {
+			t.Errorf("expected permissionset, got %s", objects[0].Type)
+		}
+		if objects[0].ID != "50080" {
+			t.Errorf("expected ID 50080, got %s", objects[0].ID)
+		}
+		if objects[0].Name != "PTE HS PermissionSet" {
+			t.Errorf("expected name 'PTE HS PermissionSet', got %s", objects[0].Name)
+		}
+	}
+}
+
+func TestScanFileMixedObjects(t *testing.T) {
+	// Test a file with multiple object types including those with and without IDs
+	content := `interface "IMyInterface"
+{
+    procedure DoSomething();
+}
+
+codeunit 50100 "My Implementation" implements "IMyInterface"
+{
+    procedure DoSomething()
+    begin
+    end;
+}
+
+controladdin "MyControlAddin"
+{
+    Scripts = 'script.js';
+}
+
+profile "MyProfile"
+{
+    Caption = 'My Profile';
+    RoleCenter = "Business Manager Role Center";
+}
+
+entitlement "MyEntitlement"
+{
+    Type = Role;
+    ObjectEntitlements = "My Permission Set";
+}
+`
+
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "mixed.al")
+	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	objects, err := ScanFile(tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should find 5 objects
+	if len(objects) != 5 {
+		t.Errorf("expected 5 objects, got %d", len(objects))
+		for _, obj := range objects {
+			t.Logf("  found: %s %s %q", obj.Type, obj.ID, obj.Name)
+		}
+	}
+
+	// Verify each object
+	expected := []struct {
+		objType string
+		id      string
+		name    string
+	}{
+		{"interface", "", "IMyInterface"},
+		{"codeunit", "50100", "My Implementation"},
+		{"controladdin", "", "MyControlAddin"},
+		{"profile", "", "MyProfile"},
+		{"entitlement", "", "MyEntitlement"},
+	}
+
+	for i, exp := range expected {
+		if i >= len(objects) {
+			break
+		}
+		if objects[i].Type != exp.objType {
+			t.Errorf("object %d: expected type %s, got %s", i, exp.objType, objects[i].Type)
+		}
+		if objects[i].ID != exp.id {
+			t.Errorf("object %d: expected ID %q, got %q", i, exp.id, objects[i].ID)
+		}
+		if objects[i].Name != exp.name {
+			t.Errorf("object %d: expected name %q, got %q", i, exp.name, objects[i].Name)
 		}
 	}
 }
