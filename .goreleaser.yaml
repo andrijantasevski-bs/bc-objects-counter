@@ -41,8 +41,5 @@ changelog:
       - Merge branch
 
 release:
-  github:
-    owner: andrijan
-    name: bc-objects-counter
   draft: false
   prerelease: auto
